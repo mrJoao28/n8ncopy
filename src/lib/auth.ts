@@ -31,5 +31,20 @@ socialProviders: {
         },
     },
 
+ databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          return {
+            data: {
+              ...user,
+              emailVerified: true,
+            },
+          }
+        },
+      },
+    },
+  },
+
 })
 
