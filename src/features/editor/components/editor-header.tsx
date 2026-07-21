@@ -20,17 +20,32 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useSuspenseWorkflow, useUpdateWorkflowName } from "@/features/workflows/hooks/user-workflows"
+import { useSuspenseWorkflow, useUpdateWorkflow, useUpdateWorkflowName } from "@/features/workflows/hooks/user-workflows"
+import { useAtomValue } from "jotai"
+import { editorAtom } from "../store/atoms"
 
 export const EditorSaveButton = ({ workflowId }: { workflowId: string }) => {
-    const handleSave = () => {
-        // TODO: plugar lógica real de save (ex: salvar nodes/edges do workflow)
-        console.log("saving workflow", workflowId)
-    }
+    const editor = useAtomValue(editorAtom);
+    const saveWorkflow = useUpdateWorkflow();
 
+    const handleSave = ()=>{
+        if(!editor){
+            return;
+        }
+
+        const nodes = editor.getNodes();
+        const edges = editor.getEdges();
+
+        saveWorkflow.mutate({
+            id:workflowId,
+            nodes,
+            edges,
+        })
+    }
+ 
     return (
         <div className="ml-auto">
-            <Button size="sm" onClick={handleSave}>
+            <Button size="sm" onClick={handleSave}  disabled={saveWorkflow.isPending}>
                 <SaveIcon className="size-4" />
                 Save
             </Button>
