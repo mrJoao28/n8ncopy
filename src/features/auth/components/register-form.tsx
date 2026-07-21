@@ -68,36 +68,25 @@ export function RegisterForm({
         },
     })
  
-    async function onSubmit(values: RegisterFormValues) {
+async function onSubmit(values: RegisterFormValues) {
         setIsLoading(true)
-        
+
         try {
             await authClient.signUp.email({
-                name:values.email,
-                email:values.email,
-                password:values.password,
-                callbackURL:"/",
+                name: values.email,
+                email: values.email,
+                password: values.password,
+                callbackURL: "/",
             },
-        {
-            onSuccess:()=>{
-                router.push("/");
-            },
-            onError: (ctx)=>{
-                toast.error(ctx.error.message)
-            }
-        })
-            // const { error } = await authClient.signUp.email({
-            //     email: values.email,
-            //     password: values.password,
-            // })
-            //
-            // if (error) {
-            //     toast.error(error.message ?? "Couldn't create account")
-            //     return
-            // }
- 
-            toast.success("Account created successfully")
-            
+                {
+                    onSuccess: () => {
+                        toast.success("Account created successfully")
+                        router.push("/");
+                    },
+                    onError: (ctx) => {
+                        toast.error(ctx.error.message)
+                    }
+                })
         } catch (error) {
             toast.error("Something went wrong. Try again.")
             console.error(error)

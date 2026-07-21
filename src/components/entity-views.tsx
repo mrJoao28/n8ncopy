@@ -152,7 +152,7 @@ interface EntitySearchProps{
 export const EntitySearch = ({value,onChange,placeholder="Search"}:EntitySearchProps) =>{
     return (
         <div className="relative ml-auto">
-            <SearchIcon className="size-3.5 absolute left-3 top-1²-translate-y-1² text-muted-foreground"></SearchIcon>
+            <SearchIcon className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"></SearchIcon>
             <Input className="max-w-[200px] bg-background shadow-none border-border pl-8"  placeholder={placeholder}  value={value} onChange={(e)=>onChange(e.target.value)} />
         </div>
     )
@@ -230,7 +230,7 @@ export const EmptyView = ({
     entity,
     message,
     onNew,
-    
+    newButtonLabel,
 }: EmptyViewProps) => {
     return (
         <Empty>
@@ -247,7 +247,7 @@ export const EmptyView = ({
                 <EmptyContent>
                     <Button size="sm" onClick={onNew}>
                         <PlusIcon className="size-4" />
-                        { "New"}
+                        {newButtonLabel ?? "New"}
                     </Button>
                 </EmptyContent>
             )}
