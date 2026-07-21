@@ -63,21 +63,18 @@ export function LoginForm({
         setIsLoading(true)
         try {
             await authClient.signIn.email({
-                email:values.email,
-                password:values.password,
-                callbackURL:"/"
-            },{
-                onSuccess:()=>{
+                email: values.email,
+                password: values.password,
+                callbackURL: "/"
+            }, {
+                onSuccess: () => {
+                    toast.success("Signed in successfully")
                     router.push("/");
                 },
-                onError:(ctx)=>{
+                onError: (ctx) => {
                     toast.error(ctx.error.message)
                 }
             })
-            
- 
-            toast.success("Signed in successfully")
-            router.push("/")
         } catch (error) {
             toast.error("Something went wrong. Try again.")
             console.error(error)
@@ -86,7 +83,7 @@ export function LoginForm({
         }
     }
  
- const [socialLoading, setSocialLoading] = useState<"github" | "google" | null>(null)
+const [socialLoading, setSocialLoading] = useState<"github" | "google" | null>(null)
 
 async function handleSocialLogin(provider: "github" | "google") {
     setSocialLoading(provider)
@@ -117,7 +114,7 @@ async function handleSocialLogin(provider: "github" | "google") {
                 <CardHeader className="text-center">
                     <div className="mb-2 flex justify-center">
                         <Image
-                            src=""
+                            src="/logo.svg"
                              alt="Logo"
                             width={40}
                             height={40}
@@ -222,7 +219,7 @@ async function handleSocialLogin(provider: "github" | "google") {
                     </Form>
  
                     <div className="mt-4 text-center text-sm">
-                        Dosent have an account?{" "}
+                        Don&apos;t have an account?{" "}
                         <Link href="/register" className="underline underline-offset-4">
                             Sign up
                         </Link>
