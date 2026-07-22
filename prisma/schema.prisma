@@ -89,8 +89,8 @@ enum NodeType {
   MANUAL_TRIGGER
   HTTP_REQUEST
   GOOGLE_FORM_TRIGGER
+  STRIPE_TRIGGER
 }
-
 model Node {
   id         String   @id @default(cuid())
   workflowId String
