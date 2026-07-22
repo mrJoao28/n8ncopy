@@ -19,3 +19,21 @@ export const httpRequestChannel = realtime.channel({
     },
   },
 });
+
+/**
+ * Realtime channel used to let a "Google Form Trigger" node flash its status
+ * in the editor whenever the webhook receives a new form submission.
+ *
+ * One channel instance per node id, keyed the same way as `httpRequestChannel`.
+ */
+export const googleFormTriggerChannel = realtime.channel({
+  name: (nodeId: string) => `google-form-trigger.${nodeId}`,
+  topics: {
+    status: {
+      schema: z.object({
+        status: z.enum(["success", "error"]),
+        message: z.string().optional(),
+      }),
+    },
+  },
+});

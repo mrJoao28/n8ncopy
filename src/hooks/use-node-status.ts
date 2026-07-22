@@ -13,7 +13,9 @@ export const useNodeStatus = (nodeId: string): NodeStatus => {
     channel: httpRequestChannel(nodeId),
     topics: ["status"],
     token: () =>
-      fetch(`/api/realtime-token?nodeId=${nodeId}`).then((res) => res.json()),
+      fetch(`/api/realtime-token?channel=http-request&nodeId=${nodeId}`).then(
+        (res) => res.json(),
+      ),
   });
 
   return messages.byTopic.status?.data.status ?? "initial";

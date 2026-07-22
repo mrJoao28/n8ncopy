@@ -8,6 +8,14 @@ import {
     PlusIcon,
     SearchIcon,
 } from "lucide-react"
+import {
+  FormInputIcon,
+  GlobeIcon,
+  MousePointerIcon,
+  PlusIcon,
+  SearchIcon,
+  WebhookIcon,
+} from "lucide-react";
 
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -61,6 +69,26 @@ type NodeSelectorProps = {
     open?: boolean
     onOpenChange?: (open: boolean) => void
 }
+const TRIGGER_OPTIONS: NodeTypeOption[] = [
+  {
+    type: NodeType.INITIAL,
+    label: "Initial Trigger",
+    descrition: "Default entry point of the flow",
+    icon: WebhookIcon,
+  },
+  {
+    type: NodeType.MANUAL_TRIGGER,
+    label: "Manual Trigger",
+    descrition: "Starts the flow manually, with a click",
+    icon: MousePointerIcon,
+  },
+  {
+    type: NodeType.GOOGLE_FORM_TRIGGER,
+    label: "Google Form Trigger",
+    descrition: "Starts the flow when a Google Form is submitted",
+    icon: FormInputIcon,
+  },
+];
 
 export function NodeSelector({ children, open: controlledOpen, onOpenChange }: NodeSelectorProps) {
     const [internalOpen, setInternalOpen] = useState(false)
