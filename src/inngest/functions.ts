@@ -1,25 +1,53 @@
-// src/inngest/functions.ts
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { inngest } from "./client";
-import { generateText } from "ai";
+import { NonRetriableError } from "inngest";
+import {inngest} from "./client"
+import prisma from "@/lib/db";
+import { topologicalSort } from "./utils";
+import { workflowsParams } from "@/features/workflows/params";
+import { NodeType } from "@/generated/prisma";
+import { getExecutor } from "@/features/executions/lib/executor-registry";
 
-const google = createGoogleGenerativeAI();
 
-export const processTask = inngest.createFunction(
-  { id: "execute-ai", triggers: { event: "execute/ai" } },
-  async ({ event, step }) => {
-    const result = await step.run("handle-task", async () => {
-      const { text } = await step.ai.wrap("gemini-generate-text", generateText, {
-        model: google("gemini-2.0-flash"),
-        system: "You are a helpful assistant",
-        prompt: "what is 2+2",
-      })
 
-      return { processed: true, id: event.data.id, text };
+export const executeWorkflow = inngest.createFunction(
+  {
+    id: "execute-workflow",
+    triggers: [{ event: "workflows/execute.workflow" }],
+  },
+  async ({ event, step }: { event: any; step: any }) => {
+    const workflowId = event.data.workflowId;
+
+    if (!workflowId) {
+      throw new NonRetriableError("Workflow ID is missing");
+    }
+
+    const sortedNodes = await step.run("prepare-workflow", async () => {
+      const workflow =  await prisma.workflow.findUniqueOrThrow({
+        where: { id: workflowId },
+        include: {
+          nodes: true,
+          connections: true,
+        },
+      });
+
+return topologicalSort(workflow.nodes,workflow.connections);
     });
 
-    await step.sleep("pause", "1s");
 
-    return result;
+    let context = event.data.initialData ||{}
+    for (const node of sortedNodes){
+      const executor = getExecutor(node.type as NodeType) 
+      context = await executor({
+        data:node.data as Record<string , unknown>,
+        nodeId:node.id,
+        context,
+        step,
+      })
+    }
+
+    return {
+      workflowId,
+      result:context
+    }
+    
   }
 );
