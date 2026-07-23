@@ -1,7 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import { BotIcon, BrainCircuitIcon, SparklesIcon } from "lucide-react";
+import { CredentialType } from "../../generated/prisma";
 
 export type AiProviderId = "gemini" | "openai" | "anthropic";
+
+// Maps an AI provider to the Credential type used to store its API key, so
+// the AI node's credential dropdown only lists matching credentials.
+export const AI_PROVIDER_CREDENTIAL_TYPE: Record<AiProviderId, CredentialType> = {
+  gemini: CredentialType.GEMINI,
+  openai: CredentialType.OPENAI,
+  anthropic: CredentialType.ANTHROPIC,
+};
 
 export type AiProviderModel = {
   id: string;
