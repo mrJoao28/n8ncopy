@@ -11,6 +11,7 @@ import { AiNodeDialog, type AiNodeFormValues } from "./dialog";
 type AiNodeData = {
   model?: string;
   prompt?: string;
+  credentialId?: string;
 };
 
 type AiNodeType = Node<AiNodeData>;

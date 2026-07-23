@@ -1,17 +1,29 @@
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary"
+import { CredentialEdit, CredentialEditError, CredentialEditLoading } from "@/features/credentials/components/credential-edit";
+import { prefetchCredential } from "@/features/credentials/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
-interface PageProps{
-    params:Promise<{
-        credentialId:string,
+import { HydrateClient } from "@/trpc/server";
+
+interface PageProps {
+    params: Promise<{
+        credentialId: string,
     }>
 }
 
-
-const Page = async ({params}:PageProps)=>{
+const Page = async ({ params }: PageProps) => {
     await requireAuth();
-    const {credentialId} = await params;
+    const { credentialId } = await params;
+    prefetchCredential(credentialId);
 
     return (
-        <p>Credential id {credentialId}</p>
+        <HydrateClient>
+            <ErrorBoundary fallback={<CredentialEditError />}>
+                <Suspense fallback={<CredentialEditLoading />}>
+                    <CredentialEdit credentialId={credentialId} />
+                </Suspense>
+            </ErrorBoundary>
+        </HydrateClient>
     )
 }
 

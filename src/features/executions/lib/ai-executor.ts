@@ -4,17 +4,23 @@ import { NonRetriableError } from "inngest";
 import { AI_PROVIDERS, type AiProviderId } from "@/config/ai-providers";
 import type { NodeExecutor } from "@/features/executions/types";
 import { aiNodeChannel } from "@/inngest/channels";
+import { decryptSecret } from "@/lib/encryption";
+import prisma from "@/lib/db";
 import { buildAiModel } from "./ai-model-builders";
 
 type AiNodeData = {
   prompt?: string;
   model?: string;
+  credentialId?: string;
 };
 
 /**
  * Builds an executor for a given AI provider. Compiles the prompt (Handlebars,
  * same convention as the HTTP Request node's body/endpoint), calls the model
  * through the Vercel AI SDK, and streams loading/success/error over realtime.
+ *
+ * If the node has a `credentialId` set, its (decrypted) secret is used as
+ * the provider's API key instead of the server's environment variable.
  */
 export const createAiExecutor = (
   providerId: AiProviderId,
@@ -39,10 +45,24 @@ export const createAiExecutor = (
     });
 
     try {
+      const apiKey = data.credentialId
+        ? await step.run(`${providerId}-resolve-credential`, async () => {
+            const credential = await prisma.credential.findUnique({
+              where: { id: data.credentialId },
+            });
+
+            if (!credential) {
+              return null;
+            }
+
+            return decryptSecret(credential.value);
+          })
+        : null;
+
       const result = await step.run(`${providerId}-generate-text`, async () => {
         const prompt = Handlebars.compile(data.prompt)(context);
         const modelId = data.model || provider.defaultModel;
-        const model = buildAiModel(providerId, modelId);
+        const model = buildAiModel(providerId, modelId, apiKey ?? undefined);
 
         const { text } = await generateText({ model, prompt });
 
