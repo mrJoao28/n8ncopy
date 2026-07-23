@@ -2,7 +2,6 @@
 import { createId } from "@paralleldrive/cuid2";
 import { useReactFlow } from "@xyflow/react";
 import {
-  CreditCardIcon,
   FormInputIcon,
   GlobeIcon,
   MousePointerIcon,
@@ -10,7 +9,7 @@ import {
   SearchIcon,
   WebhookIcon,
 } from "lucide-react";
- 
+
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -20,20 +19,21 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { AI_PROVIDERS } from "@/config/ai-providers";
 import { cn } from "@/lib/utils";
 import { NodeType } from "../../generated/prisma";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
- 
+
 export type NodeTypeOption = {
   type: NodeType;
   label: string;
   descrition: string;
   icon: React.ComponentType<{ className?: string }> | string;
 };
- 
+
 // n8n-style categories: triggers (start the flow) and actions (do something)
 const TRIGGER_OPTIONS: NodeTypeOption[] = [
   {
@@ -54,14 +54,8 @@ const TRIGGER_OPTIONS: NodeTypeOption[] = [
     descrition: "Starts the flow when a Google Form is submitted",
     icon: FormInputIcon,
   },
-  {
-    type: NodeType.STRIPE_TRIGGER,
-    label: "Stripe Trigger",
-    descrition: "Starts the flow when a Stripe event is received",
-    icon: CreditCardIcon,
-  },
 ];
- 
+
 const ACTION_OPTIONS: NodeTypeOption[] = [
   {
     type: NodeType.HTTP_REQUEST,
@@ -69,16 +63,34 @@ const ACTION_OPTIONS: NodeTypeOption[] = [
     descrition: "Sends an HTTP request to a URL",
     icon: GlobeIcon,
   },
+  {
+    type: NodeType.GEMINI,
+    label: AI_PROVIDERS.gemini.label,
+    descrition: `Generates text with ${AI_PROVIDERS.gemini.label} (${AI_PROVIDERS.gemini.pricingNote.toLowerCase()})`,
+    icon: AI_PROVIDERS.gemini.icon,
+  },
+  {
+    type: NodeType.OPENAI,
+    label: AI_PROVIDERS.openai.label,
+    descrition: `Generates text with ${AI_PROVIDERS.openai.label} (${AI_PROVIDERS.openai.pricingNote.toLowerCase()})`,
+    icon: AI_PROVIDERS.openai.icon,
+  },
+  {
+    type: NodeType.ANTHROPIC,
+    label: AI_PROVIDERS.anthropic.label,
+    descrition: `Generates text with ${AI_PROVIDERS.anthropic.label} (${AI_PROVIDERS.anthropic.pricingNote.toLowerCase()})`,
+    icon: AI_PROVIDERS.anthropic.icon,
+  },
 ];
- 
+
 export const NODE_SELECTOR_OPTIONS = [...TRIGGER_OPTIONS, ...ACTION_OPTIONS];
- 
+
 type NodeSelectorProps = {
   children?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
- 
+
 export function NodeSelector({
   children,
   open: controlledOpen,
@@ -87,14 +99,14 @@ export function NodeSelector({
   const [internalOpen, setInternalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { addNodes, getNodes, screenToFlowPosition } = useReactFlow();
- 
+
   // Supports both controlled usage (open/onOpenChange passed by the parent)
   // and uncontrolled usage (component manages its own open state)
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
- 
+
   const query = search.trim().toLowerCase();
- 
+
   const filteredTriggers = useMemo(
     () =>
       TRIGGER_OPTIONS.filter(
@@ -104,7 +116,7 @@ export function NodeSelector({
       ),
     [query],
   );
- 
+
   const filteredActions = useMemo(
     () =>
       ACTION_OPTIONS.filter(
@@ -114,9 +126,9 @@ export function NodeSelector({
       ),
     [query],
   );
- 
+
   const hasResults = filteredTriggers.length > 0 || filteredActions.length > 0;
- 
+
   const handleSelect = useCallback(
     (option: NodeTypeOption) => {
       // Impede adicionar um segundo trigger do mesmo tipo no fluxo
@@ -132,7 +144,7 @@ export function NodeSelector({
           return;
         }
       }
- 
+
       // Finds the react-flow pane on screen and converts its center
       // (in screen coordinates) into flow coordinates
       const paneBounds = document
@@ -144,26 +156,26 @@ export function NodeSelector({
       const centerScreenY = paneBounds
         ? paneBounds.y + paneBounds.height / 2
         : window.innerHeight / 2;
- 
+
       const position = screenToFlowPosition({
         x: centerScreenX + (Math.random() - 0.5) * 40,
         y: centerScreenY + (Math.random() - 0.5) * 40,
       });
- 
+
       addNodes({
         id: createId(),
         type: option.type,
         position,
         data: { label: option.label },
       });
- 
+
       toast.success(`"${option.label}" added to the flow`);
       setSearch("");
       setOpen(false);
     },
     [addNodes, getNodes, screenToFlowPosition, setOpen],
   );
- 
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -174,7 +186,7 @@ export function NodeSelector({
           </Button>
         )}
       </SheetTrigger>
- 
+
       <SheetContent
         side="right"
         className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
@@ -192,7 +204,7 @@ export function NodeSelector({
             />
           </div>
         </SheetHeader>
- 
+
         <ScrollArea className="flex-1">
           <div className="flex flex-col gap-4 p-4">
             {filteredTriggers.length > 0 && (
@@ -234,11 +246,11 @@ export function NodeSelector({
                 </div>
               </div>
             )}
- 
+
             {filteredTriggers.length > 0 && filteredActions.length > 0 && (
               <Separator />
             )}
- 
+
             {filteredActions.length > 0 && (
               <div className="flex flex-col gap-2">
                 <span className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -278,7 +290,7 @@ export function NodeSelector({
                 </div>
               </div>
             )}
- 
+
             {!hasResults && (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 No nodes found for &quot;{search}&quot;

@@ -1,6 +1,6 @@
 import { realtime } from "inngest";
 import { z } from "zod";
- 
+
 /**
  * Realtime channel used to stream execution status updates for a single
  * "HTTP Request" node back to the browser (loading -> success | error).
@@ -19,7 +19,7 @@ export const httpRequestChannel = realtime.channel({
     },
   },
 });
- 
+
 /**
  * Realtime channel used to let a "Google Form Trigger" node flash its status
  * in the editor whenever the webhook receives a new form submission.
@@ -37,22 +37,21 @@ export const googleFormTriggerChannel = realtime.channel({
     },
   },
 });
- 
+
 /**
- * Realtime channel used to let a "Stripe Trigger" node flash its status in
- * the editor whenever the webhook receives a new Stripe event.
+ * Realtime channel shared by every AI node (Gemini, OpenAI, Anthropic) to
+ * stream generation status back to the browser (loading -> success | error).
  *
- * One channel instance per node id, keyed the same way as `httpRequestChannel`.
+ * One channel instance per node id, same convention as `httpRequestChannel`.
  */
-export const stripeTriggerChannel = realtime.channel({
-  name: (nodeId: string) => `stripe-trigger.${nodeId}`,
+export const aiNodeChannel = realtime.channel({
+  name: (nodeId: string) => `ai-node.${nodeId}`,
   topics: {
     status: {
       schema: z.object({
-        status: z.enum(["success", "error"]),
+        status: z.enum(["loading", "success", "error"]),
         message: z.string().optional(),
       }),
     },
   },
 });
- 
