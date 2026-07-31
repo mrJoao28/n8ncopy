@@ -1,63 +1,92 @@
 import "server-only";
 
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  scryptSync,
+} from "node:crypto";
 
-/**
- * Encrypts/decrypts credential secrets (API keys, tokens, etc.) before they
- * are stored in / read from the database. The `Credential.value` column
- * should never contain plaintext.
- *
- * Requires a `CREDENTIALS_ENCRYPTION_KEY` env var (any non-empty string —
- * it's stretched into a 32 byte key via scrypt). Falls back to a fixed dev
- * key outside production so local setup keeps working, but this MUST be set
- * to a strong random value in production.
- */
-
-const ALGORITHM = "aes-256-gcm";
+const ALGORITHM = "aes-256-gcm" as const;
 const IV_LENGTH = 12;
+const KEY_LENGTH = 32;
 const SALT = "n8ncopy-credentials";
+const DEV_KEY = "dev-only-insecure-key";
 
 const getKey = () => {
-    const secret = process.env.CREDENTIALS_ENCRYPTION_KEY;
+  const secret = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
 
-    if (!secret) {
-        if (process.env.NODE_ENV === "production") {
-            throw new Error(
-                "CREDENTIALS_ENCRYPTION_KEY is not set. Refusing to encrypt credentials with a fallback key in production."
-            );
-        }
-        return scryptSync("dev-only-insecure-key", SALT, 32);
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "CREDENTIALS_ENCRYPTION_KEY is not set. Refusing to use a fallback key in production.",
+      );
     }
 
-    return scryptSync(secret, SALT, 32);
+    return scryptSync(DEV_KEY, SALT, KEY_LENGTH);
+  }
+
+  return scryptSync(secret, SALT, KEY_LENGTH);
 };
 
 export const encryptSecret = (plainText: string) => {
-    const key = getKey();
-    const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(ALGORITHM, key, iv);
+  if (!plainText) {
+    throw new Error("Cannot encrypt an empty credential");
+  }
 
-    const encrypted = Buffer.concat([cipher.update(plainText, "utf8"), cipher.final()]);
-    const authTag = cipher.getAuthTag();
+  const key = getKey();
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, key, iv);
 
-    return [iv.toString("hex"), authTag.toString("hex"), encrypted.toString("hex")].join(":");
+  const encrypted = Buffer.concat([
+    cipher.update(plainText, "utf8"),
+    cipher.final(),
+  ]);
+  const authTag = cipher.getAuthTag();
+
+  return [
+    iv.toString("hex"),
+    authTag.toString("hex"),
+    encrypted.toString("hex"),
+  ].join(":");
 };
 
 export const decryptSecret = (encoded: string) => {
-    const [ivHex, authTagHex, dataHex] = encoded.split(":");
+  const parts = encoded.split(":");
 
-    if (!ivHex || !authTagHex || !dataHex) {
-        throw new Error("Invalid encrypted credential value");
-    }
+  if (parts.length !== 3) {
+    throw new Error("Invalid encrypted credential value");
+  }
 
-    const key = getKey();
-    const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, "hex"));
-    decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
+  const [ivHex, authTagHex, dataHex] = parts;
 
+  if (
+    !/^[0-9a-f]+$/i.test(ivHex) ||
+    !/^[0-9a-f]+$/i.test(authTagHex) ||
+    !/^[0-9a-f]+$/i.test(dataHex)
+  ) {
+    throw new Error("Invalid encrypted credential encoding");
+  }
+
+  const iv = Buffer.from(ivHex, "hex");
+  const authTag = Buffer.from(authTagHex, "hex");
+  const encrypted = Buffer.from(dataHex, "hex");
+
+  if (iv.length !== IV_LENGTH || authTag.length !== 16 || encrypted.length === 0) {
+    throw new Error("Invalid encrypted credential value");
+  }
+
+  const decipher = createDecipheriv(ALGORITHM, getKey(), iv);
+  decipher.setAuthTag(authTag);
+
+  try {
     const decrypted = Buffer.concat([
-        decipher.update(Buffer.from(dataHex, "hex")),
-        decipher.final(),
+      decipher.update(encrypted),
+      decipher.final(),
     ]);
 
     return decrypted.toString("utf8");
+  } catch {
+    throw new Error("Unable to decrypt credential");
+  }
 };
