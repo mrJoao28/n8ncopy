@@ -1,53 +1,55 @@
 import { NonRetriableError } from "inngest";
-import {inngest} from "./client"
+import { inngest } from "./client";
 import prisma from "@/lib/db";
 import { topologicalSort } from "./utils";
-import { workflowsParams } from "@/features/workflows/params";
-import { NodeType } from "@/generated/prisma";
 import { getExecutor } from "@/features/executions/lib/executor-registry";
-
-
 
 export const executeWorkflow = inngest.createFunction(
   {
     id: "execute-workflow",
     triggers: [{ event: "workflows/execute.workflow" }],
   },
-  async ({ event, step }: { event: any; step: any }) => {
+  async ({ event, step }) => {
     const workflowId = event.data.workflowId;
 
-    if (!workflowId) {
-      throw new NonRetriableError("Workflow ID is missing");
+    if (typeof workflowId !== "string" || !workflowId.trim()) {
+      throw new NonRetriableError("Workflow ID is missing or invalid");
     }
 
-    const sortedNodes = await step.run("prepare-workflow", async () => {
-      const workflow =  await prisma.workflow.findUniqueOrThrow({
+    const workflow = await step.run("prepare-workflow", async () => {
+      return prisma.workflow.findUnique({
         where: { id: workflowId },
         include: {
           nodes: true,
           connections: true,
         },
       });
-
-return topologicalSort(workflow.nodes,workflow.connections);
     });
 
+    if (!workflow) {
+      throw new NonRetriableError(`Workflow not found: ${workflowId}`);
+    }
 
-    let context = event.data.initialData ||{}
-    for (const node of sortedNodes){
-      const executor = getExecutor(node.type as NodeType) 
+    const sortedNodes = topologicalSort(workflow.nodes, workflow.connections);
+    let context =
+      event.data.initialData && typeof event.data.initialData === "object"
+        ? event.data.initialData
+        : {};
+
+    for (const node of sortedNodes) {
+      const executor = getExecutor(node.type);
+
       context = await executor({
-        data:node.data as Record<string , unknown>,
-        nodeId:node.id,
+        data: (node.data as Record<string, unknown>) || {},
+        nodeId: node.id,
         context,
         step,
-      })
+      });
     }
 
     return {
       workflowId,
-      result:context
-    }
-    
-  }
+      result: context,
+    };
+  },
 );
