@@ -1,56 +1,68 @@
-import { auth } from '@/lib/auth';
-import { polarClient } from '@/lib/polar';
-import { initTRPC, TRPCError } from '@trpc/server';
-import { headers } from 'next/headers';
-import { cache } from 'react';
-import superjson from "superjson"
- 
+import { auth } from "@/lib/auth";
+import { polarClient } from "@/lib/polar";
+import { initTRPC, TRPCError } from "@trpc/server";
+import { headers } from "next/headers";
+import { cache } from "react";
+import superjson from "superjson";
+
 export const createTRPCContext = cache(async () => {
-  /**
-   * @see: https://trpc.io/docs/server/context
-   */
-  return { userId: 'user_123' };
+  return {};
 });
- 
-// Avoid exporting the entire t-object
-// since it's not very descriptive.
-// For instance, the use of a t variable
-// is common in i18n libraries.
+
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
 });
- 
-// Base router and procedure helpers
+
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure;
 
-export const protectedProcedure = baseProcedure.use(async ({ctx , next})=>{
+export const protectedProcedure = baseProcedure.use(async ({ next }) => {
   const session = await auth.api.getSession({
-    headers:await headers(),
-  })
-  if (!session){
-    throw new TRPCError({
-      code:"UNAUTHORIZED",
-      message:"UNAUTHORIZED"
-    })
-  }
-  return next({ctx:{...ctx , auth:session}});
-})
+    headers: await headers(),
+  });
 
+  if (!session) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+    });
+  }
+
+  return next({
+    ctx: {
+      auth: session,
+    },
+  });
+});
 
 export const premiumProcedure = protectedProcedure.use(
-  async ({ctx , next})=>{
-    const customer = await polarClient.customers.getStateExternal({
-      externalId:ctx.auth.user.id,
-    })
+  async ({ ctx, next }) => {
+    try {
+      const customer = await polarClient.customers.getStateExternal({
+        externalId: ctx.auth.user.id,
+      });
 
-    if (!customer.activeSubscriptions || customer.activeSubscriptions.length ===0){
+      if (!customer.activeSubscriptions?.length) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Active subscription required",
+        });
+      }
+
+      return next({ ctx: { ...ctx, customer } });
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+
+      // A billing-provider/network failure should not be silently converted
+      // into a successful authorization decision.
       throw new TRPCError({
-        code:"FORBIDDEN",
-        message:"Active subscription required"
-      })
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Unable to verify subscription status",
+        cause: error,
+      });
     }
-    return next({ctx:{...ctx,customer}})
-  }
-)
+  },
+);
