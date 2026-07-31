@@ -6,8 +6,7 @@ import { httpRequestChannel } from "@/inngest/channels";
 
 Handlebars.registerHelper("json", (context) => {
   const jsonString = JSON.stringify(context, null, 2);
-  const safeString = new Handlebars.SafeString(jsonString);
-  return safeString;
+  return new Handlebars.SafeString(jsonString);
 });
 
 type HttpRequestData = {
@@ -15,6 +14,8 @@ type HttpRequestData = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: string;
 };
+
+const BODY_METHODS = new Set(["POST", "PUT"]);
 
 export const HttpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
   nodeId,
@@ -24,12 +25,12 @@ export const HttpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
 }) => {
   const channel = httpRequestChannel(nodeId);
 
-  if (!data.endpoint) {
+  if (!data.endpoint?.trim()) {
     await step.realtime.publish("publish-error-no-endpoint", channel.status, {
       status: "error",
       message: "HTTP Request node: No endpoint configured",
     });
-    throw new NonRetriableError("HTTP Request node: No endpoint configured ");
+    throw new NonRetriableError("HTTP Request node: No endpoint configured");
   }
 
   await step.realtime.publish("publish-loading", channel.status, {
@@ -39,20 +40,51 @@ export const HttpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
   try {
     const result = await step.run("http-request", async () => {
       const method = data.method || "GET";
-      const endpoint = Handlebars.compile(data.endpoint)(context);
+      const endpoint = Handlebars.compile(data.endpoint)(context).trim();
 
-      const options: KyOptions = { method };
+      if (!endpoint) {
+        throw new NonRetriableError("HTTP Request node: Endpoint resolved to empty");
+      }
 
-      if (["POST", "PUT", "PATCH"].includes(method)) {
+      let url: URL;
+      try {
+        url = new URL(endpoint);
+      } catch {
+        throw new NonRetriableError(
+          `HTTP Request node: Invalid URL: ${endpoint}`,
+        );
+      }
+
+      const options: KyOptions = {
+        method,
+        retry: 0,
+        timeout: 30_000,
+      };
+
+      if (BODY_METHODS.has(method)) {
         const resolved = Handlebars.compile(data.body || "{}")(context);
-        JSON.parse(resolved);
+
+        try {
+          // Validate JSON before sending it. ky will send exactly the string
+          // supplied in `body`, avoiding an accidental double-encoding.
+          JSON.parse(resolved);
+        } catch {
+          throw new NonRetriableError(
+            "HTTP Request node: Request body must be valid JSON",
+          );
+        }
+
+        options.headers = {
+          "content-type": "application/json",
+        };
         options.body = resolved;
       }
-      const response = await ky(endpoint, options);
-      const contentType = response.headers.get("content-type");
 
-      const responseData = contentType?.includes("application/json")
-        ? await response.json()
+      const response = await ky(url, options);
+      const contentType = response.headers.get("content-type") || "";
+
+      const responseData = contentType.includes("application/json")
+        ? await response.json<unknown>()
         : await response.text();
 
       return {
@@ -73,7 +105,8 @@ export const HttpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
   } catch (error) {
     await step.realtime.publish("publish-error", channel.status, {
       status: "error",
-      message: error instanceof Error ? error.message : "HTTP request failed",
+      message:
+        error instanceof Error ? error.message : "HTTP request failed",
     });
     throw error;
   }
